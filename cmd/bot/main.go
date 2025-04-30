@@ -9,6 +9,7 @@ import (
 
 	"mot-bot/pkg/mot"
 	"mot-bot/pkg/telegram"
+	"mot-bot/pkg/ves"
 
 	"github.com/joho/godotenv"
 )
@@ -19,52 +20,62 @@ func main() {
 		log.Println("No .env file found, using environment variables")
 	}
 
-	// Get Telegram bot token
+	// Load environment variables
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
 	if token == "" {
-		log.Fatal("TELEGRAM_BOT_TOKEN environment variable is required")
+		log.Fatal("TELEGRAM_BOT_TOKEN environment variable is not set")
 	}
 
-	// Get MOT API credentials
-	clientID := os.Getenv("MOT_CLIENT_ID")
-	if clientID == "" {
-		log.Fatal("MOT_CLIENT_ID environment variable is required")
+	motAPIKey := os.Getenv("MOT_API_KEY")
+	if motAPIKey == "" {
+		log.Fatal("MOT_API_KEY environment variable is not set")
 	}
 
-	clientSecret := os.Getenv("MOT_CLIENT_SECRET")
-	if clientSecret == "" {
-		log.Fatal("MOT_CLIENT_SECRET environment variable is required")
+	motClientID := os.Getenv("MOT_CLIENT_ID")
+	if motClientID == "" {
+		log.Fatal("MOT_CLIENT_ID environment variable is not set")
 	}
 
-	apiKey := os.Getenv("MOT_API_KEY")
-	if apiKey == "" {
-		log.Fatal("MOT_API_KEY environment variable is required")
+	motClientSecret := os.Getenv("MOT_CLIENT_SECRET")
+	if motClientSecret == "" {
+		log.Fatal("MOT_CLIENT_SECRET environment variable is not set")
 	}
 
-	// Create MOT client
-	motClient := mot.NewClient(clientID, clientSecret, apiKey)
+	vesAPIKey := os.Getenv("VES_API_KEY")
+	if vesAPIKey == "" {
+		log.Fatal("VES_API_KEY environment variable is not set")
+	}
 
-	// Create and start bot
-	bot, err := telegram.NewBot(token, motClient)
+	vesBaseURL := os.Getenv("VES_API_BASE_URL")
+	if vesBaseURL == "" {
+		log.Fatal("VES_API_BASE_URL environment variable is not set")
+	}
+
+	// Create clients
+	motClient := mot.NewClient(motClientID, motClientSecret, motAPIKey)
+	vesClient := ves.NewClient(vesBaseURL, vesAPIKey)
+
+	// Create bot
+	bot, err := telegram.NewBot(token, motClient, vesClient)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}
 
-	// Create context that will be canceled on SIGINT or SIGTERM
+	// Create context that will be cancelled on SIGINT or SIGTERM
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Handle graceful shutdown
+	// Handle signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-		<-sigCh
+		<-sigChan
 		cancel()
 	}()
 
-	// Start the bot
+	// Start bot
 	log.Println("Starting bot...")
-	if err := bot.Start(ctx); err != nil && err != context.Canceled {
-		log.Fatalf("Bot error: %v", err)
+	if err := bot.Start(ctx); err != nil {
+		log.Printf("Bot stopped with error: %v", err)
 	}
 }
