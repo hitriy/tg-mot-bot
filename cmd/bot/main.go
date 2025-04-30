@@ -2,16 +2,15 @@ package main
 
 import (
 	"context"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/joho/godotenv"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
-
 	"mot-bot/pkg/mot"
 	"mot-bot/pkg/telegram"
 	"mot-bot/pkg/ves"
-
-	"github.com/joho/godotenv"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -41,6 +40,9 @@ func main() {
 		log.Fatal("MOT_CLIENT_SECRET environment variable is not set")
 	}
 
+	const motBaseURL = "https://history.mot.api.gov.uk/v1/trade/vehicles"
+	const motTokenURL = "https://api.mot.gov.uk/oauth2/token"
+
 	vesAPIKey := os.Getenv("VES_API_KEY")
 	if vesAPIKey == "" {
 		log.Fatal("VES_API_KEY environment variable is not set")
@@ -52,14 +54,16 @@ func main() {
 	}
 
 	// Create clients
-	motClient := mot.NewClient(motClientID, motClientSecret, motAPIKey)
+	motHTTPClient := mot.CreateHTTPClient(motClientID, motClientSecret, motTokenURL)
+	motClient := mot.NewClient(motHTTPClient, motAPIKey, motBaseURL)
 	vesClient := ves.NewClient(vesBaseURL, vesAPIKey)
 
 	// Create bot
-	bot, err := telegram.NewBot(token, motClient, vesClient)
+	tgBot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
-		log.Fatalf("Failed to create bot: %v", err)
+		log.Fatalf("Failed to create Telegram bot: %v", err)
 	}
+	bot := telegram.NewBot(tgBot, motClient, vesClient)
 
 	// Create context that will be cancelled on SIGINT or SIGTERM
 	ctx, cancel := context.WithCancel(context.Background())

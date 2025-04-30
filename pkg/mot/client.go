@@ -7,9 +7,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
-
-	"golang.org/x/oauth2/clientcredentials"
 )
 
 const (
@@ -17,8 +14,8 @@ const (
 )
 
 var (
-	baseURL  = "https://history.mot.api.gov.uk/v1/trade/vehicles"
-	tokenURL = getTokenURL()
+	srcBaseURL = "https://history.mot.api.gov.uk/v1/trade/vehicles"
+	tokenURL   = getTokenURL()
 )
 
 // getTokenURL returns the token URL from environment variables or a default value
@@ -37,24 +34,15 @@ type ClientInterface interface {
 // Client implements the MOT API client
 type Client struct {
 	apiKey     string
+	baseURL    string
 	httpClient *http.Client
 }
 
-func NewClient(clientID, clientSecret, apiKey string) *Client {
-	config := &clientcredentials.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		TokenURL:     tokenURL,
-		Scopes:       []string{scopeURL},
-	}
-
-	// Create an HTTP client that automatically handles token management
-	httpClient := config.Client(context.Background())
-	httpClient.Timeout = 30 * time.Second
-
+func NewClient(httpClient *http.Client, apiKey, baseURL string) *Client {
 	return &Client{
 		apiKey:     apiKey,
 		httpClient: httpClient,
+		baseURL:    baseURL,
 	}
 }
 
@@ -89,9 +77,9 @@ type Defect struct {
 }
 
 func (c *Client) GetVehicleByRegistration(ctx context.Context, registration string) (*VehicleResponse, error) {
-	url := fmt.Sprintf("%s/registration/%s", baseURL, registration)
+	url := fmt.Sprintf("%s/registration/%s", c.baseURL, registration)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

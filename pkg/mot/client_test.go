@@ -3,6 +3,8 @@ package mot
 import (
 	"context"
 	"encoding/json"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,11 +14,12 @@ func TestGetVehicleByRegistration(t *testing.T) {
 	// Create a test server for OAuth2 token
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"access_token": "test-token",
 			"token_type":   "Bearer",
 			"expires_in":   3600,
 		})
+		require.NoError(t, err)
 	}))
 	defer tokenServer.Close()
 
@@ -26,12 +29,8 @@ func TestGetVehicleByRegistration(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET request, got %s", r.Method)
 		}
-		if r.URL.Path != "/v1/trade/vehicles/registration/AB12CDE" {
-			t.Errorf("expected path /v1/trade/vehicles/registration/AB12CDE, got %s", r.URL.Path)
-		}
-		if r.Header.Get("X-API-Key") != "test-api-key" {
-			t.Errorf("expected X-API-Key header to be test-api-key, got %s", r.Header.Get("X-API-Key"))
-		}
+		assert.Equal(t, "/registration/AB12CDE", r.URL.Path)
+		assert.Equal(t, "test-api-key", r.Header.Get("X-API-Key"))
 
 		// Return a test response
 		response := VehicleResponse{
@@ -65,66 +64,41 @@ func TestGetVehicleByRegistration(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		err := json.NewEncoder(w).Encode(response)
+		require.NoError(t, err)
 	}))
 	defer apiServer.Close()
 
 	// Override the URLs for testing
 	tokenURL = tokenServer.URL
-	baseURL = apiServer.URL
+
+	httpClient := CreateHTTPClient("test-client-id", "test-client-secret", tokenServer.URL)
 
 	// Create a client
-	client := NewClient("test-client-id", "test-client-secret", "test-api-key")
+	client := NewClient(httpClient, "test-api-key", apiServer.URL)
 
 	// Test the function
 	vehicle, err := client.GetVehicleByRegistration(context.Background(), "AB12CDE")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Verify the response
-	if vehicle.Registration != "AB12CDE" {
-		t.Errorf("expected registration AB12CDE, got %s", vehicle.Registration)
-	}
-	if vehicle.Make != "FORD" {
-		t.Errorf("expected make FORD, got %s", vehicle.Make)
-	}
-	if len(vehicle.MotTests) != 1 {
-		t.Errorf("expected 1 MOT test, got %d", len(vehicle.MotTests))
-	}
-	if vehicle.MotTests[0].TestResult != "PASSED" {
-		t.Errorf("expected test result PASSED, got %s", vehicle.MotTests[0].TestResult)
-	}
+	assert.Equal(t, "AB12CDE", vehicle.Registration)
+	assert.Equal(t, "FOCUS", vehicle.Model)
+	require.Len(t, vehicle.MotTests, 1)
+	assert.Equal(t, "PASSED", vehicle.MotTests[0].TestResult)
 }
 
 func TestGetVehicleByRegistration_Error(t *testing.T) {
-	// Create a test server for OAuth2 token
-	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"access_token": "test-token",
-			"token_type":   "Bearer",
-			"expires_in":   3600,
-		})
-	}))
-	defer tokenServer.Close()
-
 	// Create a test server for the MOT API that returns an error
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer apiServer.Close()
 
-	// Override the URLs for testing
-	tokenURL = tokenServer.URL
-	baseURL = apiServer.URL
-
 	// Create a client
-	client := NewClient("test-client-id", "test-client-secret", "test-api-key")
+	client := NewClient(&http.Client{}, "test-api-key", apiServer.URL)
 
 	// Test the function
 	_, err := client.GetVehicleByRegistration(context.Background(), "AB12CDE")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	assert.Error(t, err)
 }

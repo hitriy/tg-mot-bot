@@ -23,17 +23,12 @@ type Bot struct {
 	vesClient ves.ClientInterface
 }
 
-func NewBot(token string, motClient mot.ClientInterface, vesClient ves.ClientInterface) (*Bot, error) {
-	bot, err := tgbotapi.NewBotAPI(token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create bot: %w", err)
-	}
-
+func NewBot(bot *tgbotapi.BotAPI, motClient mot.ClientInterface, vesClient ves.ClientInterface) *Bot {
 	return &Bot{
 		bot:       bot,
 		motClient: motClient,
 		vesClient: vesClient,
-	}, nil
+	}
 }
 
 // splitMessage splits a long message into chunks of maxMessageLength characters
