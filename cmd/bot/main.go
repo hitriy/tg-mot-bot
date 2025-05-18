@@ -66,6 +66,12 @@ func main() {
 		dbPath = "./data/requests.db"
 	}
 
+	// Get admin list from environment
+	adminList := os.Getenv("BOT_ADMINS")
+	if adminList == "" {
+		log.Println("Warning: BOT_ADMINS not set, /stats command will not be available to anyone")
+	}
+
 	// Ensure data directory exists
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 		log.Fatalf("Failed to create data directory: %v", err)
@@ -88,7 +94,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create Telegram bot: %v", err)
 	}
-	bot := telegram.NewBot(tgBot, motClient, vesClient, logger)
+	bot := telegram.NewBot(tgBot, motClient, vesClient, logger, adminList)
 
 	// Create context that will be cancelled on SIGINT or SIGTERM
 	ctx, cancel := context.WithCancel(context.Background())

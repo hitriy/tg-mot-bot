@@ -31,6 +31,7 @@ MOT_TOKEN_URL=you_mot_token_url
 VES_API_KEY=your_ves_api_key
 VES_API_BASE_URL=https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1
 SQLITE_DB_PATH=./data/requests.db
+BOT_ADMINS= space separated usernames or id's: @admin 12345
 ```
 
 ## Installation

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,14 +24,16 @@ type Bot struct {
 	motClient mot.ClientInterface
 	vesClient ves.ClientInterface
 	logger    *db.Logger
+	adminList string
 }
 
-func NewBot(bot *tgbotapi.BotAPI, motClient mot.ClientInterface, vesClient ves.ClientInterface, logger *db.Logger) *Bot {
+func NewBot(bot *tgbotapi.BotAPI, motClient mot.ClientInterface, vesClient ves.ClientInterface, logger *db.Logger, adminList string) *Bot {
 	return &Bot{
 		bot:       bot,
 		motClient: motClient,
 		vesClient: vesClient,
 		logger:    logger,
+		adminList: adminList,
 	}
 }
 
@@ -119,6 +122,10 @@ func (b *Bot) Start(ctx context.Context) error {
 				if err := b.sendMessage(update.Message.Chat.ID, "Simply send me a UK vehicle registration number to check its MOT history."); err != nil {
 					log.Printf("Error sending help message: %v", err)
 				}
+			case "stats":
+				if err := b.handleStats(update.Message); err != nil {
+					log.Printf("Error handling stats command: %v", err)
+				}
 			}
 		}
 	}
@@ -201,6 +208,48 @@ func (b *Bot) handleRegistration(ctx context.Context, chatID int64, registration
 	}
 
 	return b.sendMessage(chatID, response)
+}
+
+func (b *Bot) handleStats(message *tgbotapi.Message) error {
+	// Check if user is admin
+	if !b.isAdmin(message.From.ID, message.From.UserName) {
+		return b.sendMessage(message.Chat.ID, "Sorry, this command is only available to administrators.")
+	}
+
+	// Get stats from database
+	stats, err := b.logger.GetStats()
+	if err != nil {
+		return fmt.Errorf("failed to get stats: %w", err)
+	}
+
+	// Format response
+	response := fmt.Sprintf("📊 *Bot Usage Statistics*\n\n"+
+		"Last 24 hours: `%d` requests\n"+
+		"Last 30 days: `%d` requests\n"+
+		"All time: `%d` requests",
+		stats.LastDay, stats.LastMonth, stats.AllTime)
+
+	return b.sendMessage(message.Chat.ID, response)
+}
+
+// isAdmin checks if the given user (by ID or username) is in the admin list
+func (b *Bot) isAdmin(userID int64, username string) bool {
+	if b.adminList == "" {
+		return false
+	}
+
+	admins := strings.Fields(b.adminList) // Split by whitespace
+	userIDStr := strconv.FormatInt(userID, 10)
+	username = strings.TrimPrefix(username, "@") // Remove @ if present
+
+	for _, admin := range admins {
+		admin = strings.TrimPrefix(admin, "@") // Remove @ if present
+		if admin == username || admin == userIDStr {
+			return true
+		}
+	}
+
+	return false
 }
 
 func formatCombinedResponse(motVehicle *mot.VehicleResponse, vesVehicle *ves.Vehicle) string {
