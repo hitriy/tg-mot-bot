@@ -1,0 +1,17 @@
+services:
+  bot:
+    build: .
+    environment:
+      TELEGRAM_BOT_TOKEN:
+      MOT_API_KEY:
+      MOT_CLIENT_ID:
+      MOT_CLIENT_SECRET:
+      MOT_TOKEN_URL:
+      VES_API_KEY:
+      VES_API_BASE_URL: https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles
+      SQLITE_DB_PATH: /etc/data/requests.db
+      BOT_ADMINS: "@admin"
+    volumes:
+      - db-data:/etc/data
+volumes:
+  db-data:

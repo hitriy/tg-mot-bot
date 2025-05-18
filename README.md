@@ -11,7 +11,7 @@ A Telegram bot that checks MOT history and vehicle details for UK-registered veh
 
 ## Prerequisites
 
-- Go 1.21 or later
+- Go 1.24 or later
 - A Telegram bot token (get it from [@BotFather](https://t.me/BotFather))
 - A UK MOT API key (get it from [GOV.UK](https://developer-portal.driver-vehicle-licensing.api.gov.uk/))
 - A UK Vehicle Enquiry Service API key (get it from [GOV.UK](https://developer-portal.driver-vehicle-licensing.api.gov.uk/))
@@ -52,6 +52,13 @@ go mod tody
 4. Run the bot:
 ```bash
 go run cmd/bot/main.go
+```
+
+## Running in Docker
+
+Clone the repo, update values in ```compose.yaml``` and run:
+```
+sudo docker compose up -d
 ```
 
 ## Usage
