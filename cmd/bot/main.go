@@ -2,15 +2,18 @@ package main
 
 import (
 	"context"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/joho/godotenv"
 	"log"
+	"mot-bot/pkg/db"
 	"mot-bot/pkg/mot"
 	"mot-bot/pkg/telegram"
 	"mot-bot/pkg/ves"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -41,7 +44,11 @@ func main() {
 	}
 
 	const motBaseURL = "https://history.mot.api.gov.uk/v1/trade/vehicles"
-	const motTokenURL = "https://api.mot.gov.uk/oauth2/token"
+
+	motTokenURL := os.Getenv("MOT_TOKEN_URL")
+	if motClientSecret == "" {
+		log.Fatal("MOT_TOKEN_URL environment variable is not set")
+	}
 
 	vesAPIKey := os.Getenv("VES_API_KEY")
 	if vesAPIKey == "" {
@@ -53,6 +60,24 @@ func main() {
 		log.Fatal("VES_API_BASE_URL environment variable is not set")
 	}
 
+	// Get SQLite database path
+	dbPath := os.Getenv("SQLITE_DB_PATH")
+	if dbPath == "" {
+		dbPath = "./data/requests.db"
+	}
+
+	// Ensure data directory exists
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+		log.Fatalf("Failed to create data directory: %v", err)
+	}
+
+	// Initialize logger
+	logger, err := db.NewLogger(dbPath)
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	defer logger.Close()
+
 	// Create clients
 	motHTTPClient := mot.CreateHTTPClient(motClientID, motClientSecret, motTokenURL)
 	motClient := mot.NewClient(motHTTPClient, motAPIKey, motBaseURL)
@@ -63,7 +88,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create Telegram bot: %v", err)
 	}
-	bot := telegram.NewBot(tgBot, motClient, vesClient)
+	bot := telegram.NewBot(tgBot, motClient, vesClient, logger)
 
 	// Create context that will be cancelled on SIGINT or SIGTERM
 	ctx, cancel := context.WithCancel(context.Background())

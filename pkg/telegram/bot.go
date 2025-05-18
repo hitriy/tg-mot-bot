@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"mot-bot/pkg/db"
 	"mot-bot/pkg/mot"
 	"mot-bot/pkg/ves"
 
@@ -21,13 +22,15 @@ type Bot struct {
 	bot       *tgbotapi.BotAPI
 	motClient mot.ClientInterface
 	vesClient ves.ClientInterface
+	logger    *db.Logger
 }
 
-func NewBot(bot *tgbotapi.BotAPI, motClient mot.ClientInterface, vesClient ves.ClientInterface) *Bot {
+func NewBot(bot *tgbotapi.BotAPI, motClient mot.ClientInterface, vesClient ves.ClientInterface, logger *db.Logger) *Bot {
 	return &Bot{
 		bot:       bot,
 		motClient: motClient,
 		vesClient: vesClient,
+		logger:    logger,
 	}
 }
 
@@ -161,6 +164,41 @@ func (b *Bot) handleRegistration(ctx context.Context, chatID int64, registration
 
 	// Format combined response
 	response := formatCombinedResponse(motVehicle, vesVehicle)
+
+	// Get user information
+	chatConfig := tgbotapi.ChatInfoConfig{
+		ChatConfig: tgbotapi.ChatConfig{
+			ChatID: chatID,
+		},
+	}
+	chat, err := b.bot.GetChat(chatConfig)
+
+	// Prepare user information for logging
+	userID := chatID // Default to chat ID if we can't get user info
+	username := "unknown"
+
+	if err == nil {
+		if chat.IsPrivate() {
+			userID = chat.ID // For private chats, chat ID is the same as user ID
+			// Try to get the best available user identifier
+			switch {
+			case chat.UserName != "":
+				username = chat.UserName
+			case chat.FirstName != "" && chat.LastName != "":
+				username = fmt.Sprintf("%s %s", chat.FirstName, chat.LastName)
+			case chat.FirstName != "":
+				username = chat.FirstName
+			}
+		} else {
+			// For group chats, try to get the sender's information
+			username = fmt.Sprintf("group_chat_%d", chatID)
+		}
+	}
+
+	// Log the request with user ID
+	if err := b.logger.LogRequest(userID, username, registration, response); err != nil {
+		log.Printf("Failed to log request: %v", err)
+	}
 
 	return b.sendMessage(chatID, response)
 }

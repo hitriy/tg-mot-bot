@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+*.db
 mot-bot
 
 # Test binary, built with `go test -c`
